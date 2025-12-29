@@ -3,49 +3,176 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Wheel Picker</title>
+  <title>Fixed Team Poll Wheel</title>
   <style>
-    body { font-family: Arial, sans-serif; display:flex; flex-direction:column; align-items:center; padding:20px; }
-    canvas { border-radius: 50%; border: 6px solid #222; }
-    .wrap { max-width: 520px; width: 100%; display:flex; flex-direction:column; gap:12px; align-items:center; }
-    button { padding: 12px 18px; font-size: 16px; border:0; border-radius:10px; cursor:pointer; }
-    #result { font-size: 18px; font-weight: 700; }
+    body { font-family: Arial, sans-serif; background:#f8fafc; display:flex; justify-content:center; padding:18px; }
+    .card { width: min(560px, 100%); background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:18px; box-shadow:0 4px 14px rgba(0,0,0,0.06); }
+    h1 { margin:0 0 8px; font-size:20px; }
+    .muted { color:#6b7280; font-size:14px; margin:0; }
+    label { display:block; margin-top:12px; font-weight:700; }
+    input { width:100%; padding:12px; border:1px solid #d1d5db; border-radius:10px; font-size:16px; margin-top:8px; }
+    button { padding:12px 16px; border:0; border-radius:10px; cursor:pointer; font-size:16px; }
+    .btn { background:#111827; color:#fff; }
+    .btn2 { background:#e5e7eb; }
+    .btn:disabled { opacity:.55; cursor:not-allowed; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+    .error { color:#dc2626; font-weight:700; margin-top:10px; display:none; }
+
+    /* wheel */
+    .wrap { display:flex; flex-direction:column; align-items:center; gap:12px; margin-top:14px; }
     .arrow { width:0; height:0; border-left:14px solid transparent; border-right:14px solid transparent; border-bottom:22px solid #e11d48; margin-bottom:-6px; }
+    canvas { border-radius:50%; border:6px solid #222; background:#fff; }
+    #result { font-size:18px; font-weight:800; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+    .badge { background:#111827; color:#fff; padding:6px 10px; border-radius:999px; font-size:14px; font-weight:800; }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="arrow"></div>
-    <canvas id="wheel" width="420" height="420"></canvas>
-    <button id="spinBtn">SPIN</button>
-    <div id="result">Result: —</div>
+
+  <!-- LOGIN -->
+  <div id="loginView" class="card" style="display:none;">
+    <h1>Team Login</h1>
+    <p class="muted">Enter: TS, TPS, TD, TLK, TG</p>
+
+    <label for="teamInput">Team Code</label>
+    <input id="teamInput" placeholder="TS / TPS / TD / TLK / TG" autocomplete="off" />
+
+    <div class="row">
+      <button id="loginBtn" class="btn">Login</button>
+      <button id="fillDemo" class="btn2" type="button">Fill TS (demo)</button>
+    </div>
+
+    <div id="loginError" class="error"></div>
+  </div>
+
+  <!-- WHEEL -->
+  <div id="wheelView" class="card" style="display:none;">
+    <div class="topbar">
+      <div>
+        <h1 style="margin:0;">Poll Wheel</h1>
+        <p class="muted" style="margin-top:6px;">One team can spin only one time.</p>
+      </div>
+      <div class="row" style="margin:0;">
+        <span id="teamBadge" class="badge">TEAM: —</span>
+        <button id="logoutBtn" class="btn2" type="button">Logout</button>
+      </div>
+    </div>
+
+    <div class="wrap">
+      <div class="arrow"></div>
+      <canvas id="wheel" width="420" height="420"></canvas>
+
+      <button id="spinBtn" class="btn">SPIN (ONE TIME)</button>
+      <div id="result">Result: —</div>
+      <div id="status" class="muted"></div>
+    </div>
   </div>
 
   <script>
-    // ✅ Fixed values (edit these)
-    const options = ["A", "B", "C", "D", "E", "F"];
+    // ✅ FIXED TEAM -> PLAYER (hidden mapping, no UI)
+    const TEAM_TO_PLAYER = {
+      TS:  "Selva",
+      TPS: "Navinkanth",
+      TD:  "Divagar",
+      TLK: "Ilayaraja",
+      TG:  "Janaster"
+    };
+
+    // Wheel order (keep same order always)
+    const options = ["Selva","Navinkanth","Divagar","Ilayaraja","Janaster"];
+
+    // Storage keys
+    const KEY_TEAM = "pollwheel_team";
+    const keySpun = (team) => `pollwheel_spun_${team}`;
+    const keyWinner = (team) => `pollwheel_winner_${team}`;
+
+    // Elements
+    const loginView = document.getElementById("loginView");
+    const wheelView = document.getElementById("wheelView");
+
+    const teamInput = document.getElementById("teamInput");
+    const loginBtn = document.getElementById("loginBtn");
+    const fillDemo = document.getElementById("fillDemo");
+    const loginError = document.getElementById("loginError");
+
+    const teamBadge = document.getElementById("teamBadge");
+    const logoutBtn = document.getElementById("logoutBtn");
 
     const canvas = document.getElementById("wheel");
     const ctx = canvas.getContext("2d");
     const spinBtn = document.getElementById("spinBtn");
     const resultEl = document.getElementById("result");
+    const statusEl = document.getElementById("status");
 
+    // Wheel math
     const cx = canvas.width / 2, cy = canvas.height / 2;
     const radius = Math.min(cx, cy) - 10;
+    const TAU = Math.PI * 2;
 
-    let angle = 0;       // current rotation
+    let angle = 0;
     let spinning = false;
 
+    function normalizeTeam(s) {
+      return (s || "").trim().toUpperCase();
+    }
+    function isValidTeam(team) {
+      return Object.prototype.hasOwnProperty.call(TEAM_TO_PLAYER, team);
+    }
+
+    function showLogin() {
+      wheelView.style.display = "none";
+      loginView.style.display = "block";
+      loginError.style.display = "none";
+      teamInput.value = "";
+      teamInput.focus();
+    }
+
+    function showWheel(team) {
+      loginView.style.display = "none";
+      wheelView.style.display = "block";
+      teamBadge.textContent = "TEAM: " + team;
+
+      drawWheel();
+      applyOneTimeState(team);
+    }
+
+    function doLogin() {
+      const team = normalizeTeam(teamInput.value);
+      if (!isValidTeam(team)) {
+        loginError.textContent = "Invalid team. Use TS, TPS, TD, TLK, TG";
+        loginError.style.display = "block";
+        return;
+      }
+      localStorage.setItem(KEY_TEAM, team);
+      showWheel(team);
+    }
+
+    loginBtn.addEventListener("click", doLogin);
+    teamInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+    fillDemo.addEventListener("click", () => { teamInput.value = "TS"; teamInput.focus(); });
+
+    logoutBtn.addEventListener("click", () => {
+      const team = localStorage.getItem(KEY_TEAM);
+      if (team) {
+        // logout resets one-time lock
+        localStorage.removeItem(keySpun(team));
+        localStorage.removeItem(keyWinner(team));
+      }
+      localStorage.removeItem(KEY_TEAM);
+      resultEl.textContent = "Result: —";
+      statusEl.textContent = "";
+      showLogin();
+    });
+
+    // --------- Wheel drawing ----------
     function drawWheel() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      const slice = (Math.PI * 2) / options.length;
+      const slice = TAU / options.length;
 
       for (let i = 0; i < options.length; i++) {
         const start = angle + i * slice;
         const end = start + slice;
 
-        // simple color pattern
         ctx.beginPath();
         ctx.moveTo(cx, cy);
         ctx.arc(cx, cy, radius, start, end);
@@ -53,7 +180,6 @@
         ctx.fillStyle = i % 2 === 0 ? "#22c55e" : "#3b82f6";
         ctx.fill();
 
-        // text
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(start + slice / 2);
@@ -64,33 +190,79 @@
         ctx.restore();
       }
 
-      // center circle
       ctx.beginPath();
-      ctx.arc(cx, cy, 42, 0, Math.PI * 2);
+      ctx.arc(cx, cy, 42, 0, TAU);
       ctx.fillStyle = "#111827";
       ctx.fill();
+
       ctx.fillStyle = "#fff";
       ctx.font = "bold 14px Arial";
       ctx.textAlign = "center";
       ctx.fillText("SPIN", cx, cy + 5);
     }
 
+    // index selected by top arrow
     function getSelectedIndex() {
-      // arrow is at top (angle = -90deg)
-      const slice = (Math.PI * 2) / options.length;
-      const normalized = (Math.PI * 2 + (angle % (Math.PI * 2))) % (Math.PI * 2);
-      const pointerAngle = (Math.PI * 1.5 - normalized) % (Math.PI * 2); // top pointer
+      const slice = TAU / options.length;
+      const normalized = (TAU + (angle % TAU)) % TAU;
+      const pointerAngle = (Math.PI * 1.5 - normalized + TAU) % TAU;
       return Math.floor(pointerAngle / slice) % options.length;
     }
 
-    function spin() {
+    // compute angle so that idx lands on the top pointer
+    function angleForIndexAtTop(idx) {
+      const slice = TAU / options.length;
+      const pointerAngle = idx * slice + slice / 2;
+      let a = (Math.PI * 1.5 - pointerAngle) % TAU;
+      if (a < 0) a += TAU;
+      return a;
+    }
+
+    function applyOneTimeState(team) {
+      const spun = localStorage.getItem(keySpun(team)) === "1";
+      const winner = localStorage.getItem(keyWinner(team));
+
+      if (spun && winner) {
+        spinBtn.disabled = true;
+        resultEl.textContent = "Result: " + winner + " ✅ (Locked)";
+        statusEl.textContent = "This team already spun. Refresh will not change it.";
+        const idx = options.indexOf(winner);
+        if (idx >= 0) {
+          angle = angleForIndexAtTop(idx);
+          drawWheel();
+        }
+      } else {
+        spinBtn.disabled = false;
+        resultEl.textContent = "Result: —";
+        statusEl.textContent = "You can spin ONE time only.";
+      }
+    }
+
+    // --------- FIXED SPIN (one time) ----------
+    function spinFixedOnce() {
+      const team = localStorage.getItem(KEY_TEAM);
+      if (!team || !isValidTeam(team)) return;
+
+      if (localStorage.getItem(keySpun(team)) === "1") {
+        applyOneTimeState(team);
+        return;
+      }
+
+      const fixedWinner = TEAM_TO_PLAYER[team];
+      const idx = options.indexOf(fixedWinner);
+      if (idx < 0) return;
+
       if (spinning) return;
       spinning = true;
       spinBtn.disabled = true;
       resultEl.textContent = "Result: spinning...";
+      statusEl.textContent = "Spinning...";
 
-      const spins = 6 + Math.random() * 4; // 6–10 rounds
-      const target = angle + spins * Math.PI * 2 + Math.random() * Math.PI * 2;
+      const startAngle = angle;
+      const finalAngleBase = angleForIndexAtTop(idx);
+
+      const extraSpins = 7;
+      const targetAngle = finalAngleBase + extraSpins * TAU;
 
       const start = performance.now();
       const duration = 4200;
@@ -99,27 +271,40 @@
 
       function frame(now) {
         const t = Math.min(1, (now - start) / duration);
-        angle = angle + (target - angle) * easeOutCubic(t);
+        const eased = easeOutCubic(t);
+
+        angle = startAngle + (targetAngle - startAngle) * eased;
         drawWheel();
 
         if (t < 1) {
           requestAnimationFrame(frame);
         } else {
-          spinning = false;
-          spinBtn.disabled = false;
+          angle = finalAngleBase;
+          drawWheel();
 
-          const idx = getSelectedIndex();
-          const winner = options[idx];
-          resultEl.textContent = "Result: " + winner;
+          spinning = false;
+
+          localStorage.setItem(keySpun(team), "1");
+          localStorage.setItem(keyWinner(team), fixedWinner);
+
+          resultEl.textContent = "Result: " + fixedWinner + " ✅ (Locked)";
+          statusEl.textContent = "Saved. Refresh will still show the same fixed result.";
+          spinBtn.disabled = true;
         }
       }
       requestAnimationFrame(frame);
     }
 
-    spinBtn.addEventListener("click", spin);
-    canvas.addEventListener("click", spin);
+    spinBtn.addEventListener("click", spinFixedOnce);
+    canvas.addEventListener("click", spinFixedOnce);
 
-    drawWheel();
+    // --------- Boot ----------
+    const savedTeam = localStorage.getItem(KEY_TEAM);
+    if (savedTeam && isValidTeam(savedTeam)) {
+      showWheel(savedTeam);
+    } else {
+      showLogin();
+    }
   </script>
 </body>
 </html>
