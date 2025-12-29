@@ -1,0 +1,125 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Wheel Picker</title>
+  <style>
+    body { font-family: Arial, sans-serif; display:flex; flex-direction:column; align-items:center; padding:20px; }
+    canvas { border-radius: 50%; border: 6px solid #222; }
+    .wrap { max-width: 520px; width: 100%; display:flex; flex-direction:column; gap:12px; align-items:center; }
+    button { padding: 12px 18px; font-size: 16px; border:0; border-radius:10px; cursor:pointer; }
+    #result { font-size: 18px; font-weight: 700; }
+    .arrow { width:0; height:0; border-left:14px solid transparent; border-right:14px solid transparent; border-bottom:22px solid #e11d48; margin-bottom:-6px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="arrow"></div>
+    <canvas id="wheel" width="420" height="420"></canvas>
+    <button id="spinBtn">SPIN</button>
+    <div id="result">Result: —</div>
+  </div>
+
+  <script>
+    // ✅ Fixed values (edit these)
+    const options = ["A", "B", "C", "D", "E", "F"];
+
+    const canvas = document.getElementById("wheel");
+    const ctx = canvas.getContext("2d");
+    const spinBtn = document.getElementById("spinBtn");
+    const resultEl = document.getElementById("result");
+
+    const cx = canvas.width / 2, cy = canvas.height / 2;
+    const radius = Math.min(cx, cy) - 10;
+
+    let angle = 0;       // current rotation
+    let spinning = false;
+
+    function drawWheel() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const slice = (Math.PI * 2) / options.length;
+
+      for (let i = 0; i < options.length; i++) {
+        const start = angle + i * slice;
+        const end = start + slice;
+
+        // simple color pattern
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, radius, start, end);
+        ctx.closePath();
+        ctx.fillStyle = i % 2 === 0 ? "#22c55e" : "#3b82f6";
+        ctx.fill();
+
+        // text
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(start + slice / 2);
+        ctx.textAlign = "right";
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 16px Arial";
+        ctx.fillText(options[i], radius - 14, 6);
+        ctx.restore();
+      }
+
+      // center circle
+      ctx.beginPath();
+      ctx.arc(cx, cy, 42, 0, Math.PI * 2);
+      ctx.fillStyle = "#111827";
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 14px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText("SPIN", cx, cy + 5);
+    }
+
+    function getSelectedIndex() {
+      // arrow is at top (angle = -90deg)
+      const slice = (Math.PI * 2) / options.length;
+      const normalized = (Math.PI * 2 + (angle % (Math.PI * 2))) % (Math.PI * 2);
+      const pointerAngle = (Math.PI * 1.5 - normalized) % (Math.PI * 2); // top pointer
+      return Math.floor(pointerAngle / slice) % options.length;
+    }
+
+    function spin() {
+      if (spinning) return;
+      spinning = true;
+      spinBtn.disabled = true;
+      resultEl.textContent = "Result: spinning...";
+
+      const spins = 6 + Math.random() * 4; // 6–10 rounds
+      const target = angle + spins * Math.PI * 2 + Math.random() * Math.PI * 2;
+
+      const start = performance.now();
+      const duration = 4200;
+
+      function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+      function frame(now) {
+        const t = Math.min(1, (now - start) / duration);
+        angle = angle + (target - angle) * easeOutCubic(t);
+        drawWheel();
+
+        if (t < 1) {
+          requestAnimationFrame(frame);
+        } else {
+          spinning = false;
+          spinBtn.disabled = false;
+
+          const idx = getSelectedIndex();
+          const winner = options[idx];
+          resultEl.textContent = "Result: " + winner;
+        }
+      }
+      requestAnimationFrame(frame);
+    }
+
+    spinBtn.addEventListener("click", spin);
+    canvas.addEventListener("click", spin);
+
+    drawWheel();
+  </script>
+</body>
+</html>
