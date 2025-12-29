@@ -39,7 +39,6 @@
 
     <div class="row">
       <button id="loginBtn" class="btn">Login</button>
-      
     </div>
 
     <div id="loginError" class="error"></div>
@@ -81,8 +80,7 @@
     // Wheel order (fixed)
     const options = ["Selva","Navinkanth","Divagar","Ilayaraja","Janaster"];
 
-    // ✅ 5 fixed colors (yellow, pink, brown, red, violet)
-    // Order matches options array above
+    // ✅ 5 fixed colors: yellow, pink, brown, red, violet
     const sliceColors = [
       "#facc15", // Yellow - Selva
       "#ec4899", // Pink   - Navinkanth
@@ -102,7 +100,6 @@
 
     const teamInput = document.getElementById("teamInput");
     const loginBtn = document.getElementById("loginBtn");
-    const fillDemo = document.getElementById("fillDemo");
     const loginError = document.getElementById("loginError");
 
     const teamBadge = document.getElementById("teamBadge");
@@ -159,7 +156,6 @@
 
     loginBtn.addEventListener("click", doLogin);
     teamInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
-    fillDemo.addEventListener("click", () => { teamInput.value = "TS"; teamInput.focus(); });
 
     logoutBtn.addEventListener("click", () => {
       const team = localStorage.getItem(KEY_TEAM);
@@ -188,7 +184,6 @@
         ctx.arc(cx, cy, radius, start, end);
         ctx.closePath();
 
-        // ✅ fixed colors for each member
         ctx.fillStyle = sliceColors[i] || "#3b82f6";
         ctx.fill();
 
@@ -272,7 +267,7 @@
       const targetAngle = finalAngleBase + extraSpins * TAU;
 
       const start = performance.now();
-      const duration = 8000;
+      const duration = 8000; // ✅ longer spin time, same fixed winner
 
       function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
 
