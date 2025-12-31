@@ -6,7 +6,7 @@
   <title>Team Poll Wheel</title>
   <style>
     body { font-family: Arial, sans-serif; background:#f8fafc; display:flex; justify-content:center; padding:18px; }
-    .card { width: min(560px, 100%); background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:18px; box-shadow:0 4px 14px rgba(0,0,0,0.06); }
+    .card { width: min(640px, 100%); background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:18px; box-shadow:0 4px 14px rgba(0,0,0,0.06); }
     h1 { margin:0 0 8px; font-size:20px; }
     .muted { color:#6b7280; font-size:14px; margin:0; }
     label { display:block; margin-top:12px; font-weight:700; }
@@ -18,13 +18,13 @@
     .row { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
     .error { color:#dc2626; font-weight:700; margin-top:10px; display:none; }
 
-    /* wheel */
     .wrap { display:flex; flex-direction:column; align-items:center; gap:12px; margin-top:14px; }
     .arrow { width:0; height:0; border-left:14px solid transparent; border-right:14px solid transparent; border-bottom:22px solid #e11d48; margin-bottom:-6px; }
     canvas { border-radius:50%; border:6px solid #222; background:#fff; }
-    #result { font-size:18px; font-weight:800; }
-    .topbar { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+    #result { font-size:18px; font-weight:900; }
+    .topbar { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap; }
     .badge { background:#111827; color:#fff; padding:6px 10px; border-radius:999px; font-size:14px; font-weight:800; }
+    .hr { height:1px; background:#e5e7eb; margin:14px 0; }
   </style>
 </head>
 <body>
@@ -42,6 +42,9 @@
     </div>
 
     <div id="loginError" class="error"></div>
+
+    <div class="hr"></div>
+   
   </div>
 
   <!-- WHEEL -->
@@ -49,7 +52,7 @@
     <div class="topbar">
       <div>
         <h1 style="margin:0;">Poll Wheel</h1>
-        <p class="muted" style="margin-top:6px;">One team can spin only one time.</p>
+       
       </div>
       <div class="row" style="margin:0;">
         <span id="teamBadge" class="badge">TEAM: —</span>
@@ -62,13 +65,15 @@
       <canvas id="wheel" width="420" height="420"></canvas>
 
       <button id="spinBtn" class="btn">SPIN (ONE TIME)</button>
+
       <div id="result">Result: —</div>
       <div id="status" class="muted"></div>
+      <div id="modeInfo" class="muted"></div>
     </div>
   </div>
 
   <script>
-    // ✅ FIXED TEAM -> PLAYER
+    // Teams and players
     const TEAM_TO_PLAYER = {
       TS:  "Selva",
       TPS: "Navinkanth",
@@ -77,22 +82,40 @@
       TG:  "Janaster"
     };
 
-    // Wheel order (fixed)
     const options = ["Selva","Navinkanth","Divagar","Ilayaraja","Janaster"];
 
-    // ✅ 5 fixed colors: yellow, pink, brown, red, violet
     const sliceColors = [
-      "#facc15", // Yellow - Selva
-      "#ec4899", // Pink   - Navinkanth
-      "#92400e", // Brown  - Divagar
-      "#ef4444", // Red    - Ilayaraja
-      "#8b5cf6"  // Violet - Janaster
+      "#facc15", // Selva
+      "#ec4899", // Navinkanth
+      "#92400e", // Divagar
+      "#ef4444", // Ilayaraja
+      "#8b5cf6"  // Janaster
     ];
 
-    // Storage keys
-    const KEY_TEAM = "pollwheel_team";
-    const keySpun = (team) => `pollwheel_spun_${team}`;
-    const keyWinner = (team) => `pollwheel_winner_${team}`;
+    // -------- Storage keys (TEAM PAGE) --------
+    const KEY_CURRENT_TEAM = "pollwheel_current_team";
+
+    const keyLoginUsed   = (team) => `pollwheel_login_used_${team}`;   // team login used (permanent until admin resets)
+    const keySpun        = (team) => `pollwheel_spun_${team}`;         // team spun once
+    const keyWinner      = (team) => `pollwheel_winner_${team}`;       // team winner locked
+
+    // -------- Storage keys (ADMIN DECIDES) --------
+    // mode: "fixed" or "random"
+    const keyMode        = (team) => `pollwheel_admin_mode_${team}`;
+    // fixed winner chosen by admin (optional). If empty, fallback to TEAM_TO_PLAYER mapping
+    const keyFixedPick   = (team) => `pollwheel_admin_fixed_pick_${team}`;
+
+    // Defaults if admin didn't set yet
+    const DEFAULT_MODE = "fixed"; // default admin mode
+    function getMode(team) {
+      return localStorage.getItem(keyMode(team)) || DEFAULT_MODE;
+    }
+    function getAdminFixedWinner(team) {
+      const pick = localStorage.getItem(keyFixedPick(team));
+      if (pick && options.includes(pick)) return pick;
+      // fallback to mapping if admin didn't choose
+      return TEAM_TO_PLAYER[team];
+    }
 
     // Elements
     const loginView = document.getElementById("loginView");
@@ -110,6 +133,7 @@
     const spinBtn = document.getElementById("spinBtn");
     const resultEl = document.getElementById("result");
     const statusEl = document.getElementById("status");
+    const modeInfo = document.getElementById("modeInfo");
 
     // Wheel math
     const cx = canvas.width / 2, cy = canvas.height / 2;
@@ -119,12 +143,8 @@
     let angle = 0;
     let spinning = false;
 
-    function normalizeTeam(s) {
-      return (s || "").trim().toUpperCase();
-    }
-    function isValidTeam(team) {
-      return Object.prototype.hasOwnProperty.call(TEAM_TO_PLAYER, team);
-    }
+    function normalizeTeam(s) { return (s || "").trim().toUpperCase(); }
+    function isValidTeam(team) { return Object.prototype.hasOwnProperty.call(TEAM_TO_PLAYER, team); }
 
     function showLogin() {
       wheelView.style.display = "none";
@@ -138,19 +158,28 @@
       loginView.style.display = "none";
       wheelView.style.display = "block";
       teamBadge.textContent = "TEAM: " + team;
-
       drawWheel();
-      applyOneTimeState(team);
+      applyState(team);
     }
 
     function doLogin() {
       const team = normalizeTeam(teamInput.value);
+
       if (!isValidTeam(team)) {
         loginError.textContent = "Invalid team. Use TS, TPS, TD, TLK, TG";
         loginError.style.display = "block";
         return;
       }
-      localStorage.setItem(KEY_TEAM, team);
+
+      // login one time only
+      if (localStorage.getItem(keyLoginUsed(team)) === "1") {
+        loginError.textContent = "This team already used login once. Admin can reset/unlock.";
+        loginError.style.display = "block";
+        return;
+      }
+
+      localStorage.setItem(keyLoginUsed(team), "1");
+      localStorage.setItem(KEY_CURRENT_TEAM, team);
       showWheel(team);
     }
 
@@ -158,19 +187,14 @@
     teamInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
 
     logoutBtn.addEventListener("click", () => {
-      const team = localStorage.getItem(KEY_TEAM);
-      if (team) {
-        // logout resets one-time lock
-        localStorage.removeItem(keySpun(team));
-        localStorage.removeItem(keyWinner(team));
-      }
-      localStorage.removeItem(KEY_TEAM);
+      localStorage.removeItem(KEY_CURRENT_TEAM);
       resultEl.textContent = "Result: —";
       statusEl.textContent = "";
+      modeInfo.textContent = "";
       showLogin();
     });
 
-    // --------- Wheel drawing ----------
+    // -------- Wheel drawing --------
     function drawWheel() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const slice = TAU / options.length;
@@ -187,7 +211,6 @@
         ctx.fillStyle = sliceColors[i] || "#3b82f6";
         ctx.fill();
 
-        // text
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(start + slice / 2);
@@ -198,7 +221,6 @@
         ctx.restore();
       }
 
-      // center circle
       ctx.beginPath();
       ctx.arc(cx, cy, 42, 0, TAU);
       ctx.fillStyle = "#111827";
@@ -210,7 +232,6 @@
       ctx.fillText("SPIN", cx, cy + 5);
     }
 
-    // compute angle so that idx lands on the top pointer
     function angleForIndexAtTop(idx) {
       const slice = TAU / options.length;
       const pointerAngle = idx * slice + slice / 2;
@@ -219,55 +240,17 @@
       return a;
     }
 
-    function applyOneTimeState(team) {
-      const spun = localStorage.getItem(keySpun(team)) === "1";
-      const winner = localStorage.getItem(keyWinner(team));
-
-      if (spun && winner) {
-        spinBtn.disabled = true;
-        resultEl.textContent = "Result: " + winner + " ✅ (Locked)";
-        statusEl.textContent = "This team already spun. Refresh will not change it.";
-
-        const idx = options.indexOf(winner);
-        if (idx >= 0) {
-          angle = angleForIndexAtTop(idx);
-          drawWheel();
-        }
-      } else {
-        spinBtn.disabled = false;
-        resultEl.textContent = "Result: —";
-        statusEl.textContent = "You can spin ONE time only.";
-      }
-    }
-
-    // --------- FIXED SPIN (one time) ----------
-    function spinFixedOnce() {
-      const team = localStorage.getItem(KEY_TEAM);
-      if (!team || !isValidTeam(team)) return;
-
-      if (localStorage.getItem(keySpun(team)) === "1") {
-        applyOneTimeState(team);
-        return;
-      }
-
-      const fixedWinner = TEAM_TO_PLAYER[team];
-      const idx = options.indexOf(fixedWinner);
-      if (idx < 0) return;
-
+    function spinToIndex(idx, onDone) {
       if (spinning) return;
       spinning = true;
-      spinBtn.disabled = true;
-      resultEl.textContent = "Result: spinning...";
-      statusEl.textContent = "Spinning...";
 
       const startAngle = angle;
       const finalAngleBase = angleForIndexAtTop(idx);
-
-      const extraSpins = 7;
+      const extraSpins = 6 + Math.floor(Math.random() * 3);
       const targetAngle = finalAngleBase + extraSpins * TAU;
 
       const start = performance.now();
-      const duration = 8000; // ✅ longer spin time, same fixed winner
+      const duration = 5200;
 
       function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
 
@@ -278,35 +261,85 @@
         angle = startAngle + (targetAngle - startAngle) * eased;
         drawWheel();
 
-        if (t < 1) {
-          requestAnimationFrame(frame);
-        } else {
+        if (t < 1) requestAnimationFrame(frame);
+        else {
           angle = finalAngleBase;
           drawWheel();
-
           spinning = false;
-
-          localStorage.setItem(keySpun(team), "1");
-          localStorage.setItem(keyWinner(team), fixedWinner);
-
-          resultEl.textContent = "Result: " + fixedWinner + " ✅ (Locked)";
-          statusEl.textContent = "Saved. Refresh will still show the same fixed result.";
-          spinBtn.disabled = true;
+          onDone?.();
         }
       }
       requestAnimationFrame(frame);
     }
 
-    spinBtn.addEventListener("click", spinFixedOnce);
-    canvas.addEventListener("click", spinFixedOnce);
+    function applyState(team) {
+      const spun = localStorage.getItem(keySpun(team)) === "1";
+      const winner = localStorage.getItem(keyWinner(team));
+      const mode = getMode(team);
+      const fixedPick = getAdminFixedWinner(team);
 
-    // --------- Boot ----------
-    const savedTeam = localStorage.getItem(KEY_TEAM);
-    if (savedTeam && isValidTeam(savedTeam)) {
-      showWheel(savedTeam);
-    } else {
-      showLogin();
+
+
+      if (spun && winner) {
+        spinBtn.disabled = true;
+        resultEl.textContent = "Result: " + winner + " ✅ (Locked)";
+        statusEl.textContent = "Already spun. Admin must reset to spin again.";
+
+        const idx = options.indexOf(winner);
+        if (idx >= 0) { angle = angleForIndexAtTop(idx); drawWheel(); }
+      } else {
+        spinBtn.disabled = false;
+        resultEl.textContent = "Result: —";
+        statusEl.textContent = "You can spin ONE time only.";
+      }
     }
+
+    // -------- SINGLE SPIN (admin decides fixed/random) --------
+    function spinOnceAdminControlled() {
+      const team = localStorage.getItem(KEY_CURRENT_TEAM);
+      if (!team || !isValidTeam(team)) return;
+
+      if (localStorage.getItem(keySpun(team)) === "1") {
+        applyState(team);
+        return;
+      }
+
+      const mode = getMode(team);
+      let winner;
+
+      if (mode === "random") {
+        const idxR = Math.floor(Math.random() * options.length);
+        winner = options[idxR];
+      } else {
+        winner = getAdminFixedWinner(team); // admin chosen or mapping fallback
+      }
+
+      const idx = options.indexOf(winner);
+      if (idx < 0) return;
+
+      spinBtn.disabled = true;
+      resultEl.textContent = "Result: spinning...";
+      statusEl.textContent = "Spinning...";
+
+      spinToIndex(idx, () => {
+        localStorage.setItem(keySpun(team), "1");
+        localStorage.setItem(keyWinner(team), winner);
+
+        resultEl.textContent = "Result: " + winner + " ✅ (Locked)";
+        statusEl.textContent = "Saved. Admin controls reset/unlock.";
+        applyState(team);
+      });
+    }
+
+    spinBtn.addEventListener("click", spinOnceAdminControlled);
+    canvas.addEventListener("click", spinOnceAdminControlled);
+
+    // Boot
+    (function boot() {
+      const savedTeam = localStorage.getItem(KEY_CURRENT_TEAM);
+      if (savedTeam && isValidTeam(savedTeam)) showWheel(savedTeam);
+      else showLogin();
+    })();
   </script>
 </body>
 </html>
