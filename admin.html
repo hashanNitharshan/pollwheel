@@ -54,7 +54,7 @@
       <thead>
         <tr>
           <th style="width:80px;">Team</th>
-          <th style="width:320px;">Admin Mode</th>
+          <th style="width:360px;">Admin Mode</th>
           <th>Team Status</th>
           <th style="width:360px;">Actions</th>
         </tr>
@@ -63,20 +63,35 @@
     </table>
   </div>
 
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
   <script>
     const ADMIN_PIN="1234";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyApEQ8ogTpZ94IZRh_GWtCsUhi608x4sG4",
+      authDomain: "tpl-poll-wheel.firebaseapp.com",
+      projectId: "tpl-poll-wheel",
+      storageBucket: "tpl-poll-wheel.firebasestorage.app",
+      messagingSenderId: "149256036270",
+      appId: "1:149256036270:web:f7d9486571ef69501df23f"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
     const TEAMS=["TS","TPS","TD","TLK","TG","TT"];
     const options=["Selva","Navinkanth","Divagar","Ilayaraja","Janaster","Father of Rakshan"];
 
-    const KEY_CURRENT_TEAM="pollwheel_current_team";
-
-    const keyLoginUsed=(t)=>`pollwheel_login_used_${t}`;
-    const keySpun=(t)=>`pollwheel_spun_${t}`;
-    const keyWinner=(t)=>`pollwheel_winner_${t}`;
-
-    const keyMode=(t)=>`pollwheel_admin_mode_${t}`;
-    const keyFixedPick=(t)=>`pollwheel_admin_fixed_pick_${t}`;
-    const keyAdminRandomPick=(t)=>`pollwheel_admin_random_pick_${t}`;
+    const TEAM_TO_PLAYER={
+      TS:"Selva",
+      TPS:"Navinkanth",
+      TD:"Divagar",
+      TLK:"Ilayaraja",
+      TG:"Janaster",
+      TT:"Father of Rakshan"
+    };
 
     const DEFAULT_MODE="fixed";
     const ADMIN_UNLOCK_KEY="pollwheel_admin_unlocked";
@@ -94,27 +109,58 @@
     const assignRandomBtn=document.getElementById("assignRandomBtn");
 
     const pill=(txt,kind)=>`<span class="pill ${kind}">${txt}</span>`;
-    const getMode=(t)=>localStorage.getItem(keyMode(t))||DEFAULT_MODE;
 
-    function getFixedPick(t){
-      const pick=localStorage.getItem(keyFixedPick(t));
-      return (pick&&options.includes(pick))?pick:options[0];
+    function teamRef(team){ return db.collection("teams").doc(team); }
+
+    async function ensureTeamDoc(team){
+      const ref=teamRef(team);
+      const snap=await ref.get();
+      if(!snap.exists){
+        await ref.set({
+          team,
+          loginUsed:false,
+          spun:false,
+          winner:"",
+          mode:"fixed",
+          fixedPick: TEAM_TO_PLAYER[team] || "",
+          randomPick:"",
+          updatedAt: Date.now()
+        }, { merge:true });
+      }
     }
 
-    function getRandomPick(t){
-      const pick=localStorage.getItem(keyAdminRandomPick(t));
-      return (pick&&options.includes(pick))?pick:"—";
+    async function ensureAll(){
+      for(const t of TEAMS) await ensureTeamDoc(t);
     }
 
-    function render(){
+    function shuffle(arr){
+      const a=arr.slice();
+      for(let i=a.length-1;i>0;i--){
+        const j=Math.floor(Math.random()*(i+1));
+        [a[i],a[j]]=[a[j],a[i]];
+      }
+      return a;
+    }
+
+    // Real-time render
+    function listenAll(){
+      db.collection("teams").onSnapshot((snap)=>{
+        const map = {};
+        snap.forEach(d=>{ map[d.id]=d.data(); });
+        render(map);
+      });
+    }
+
+    function render(map){
       tbody.innerHTML="";
       TEAMS.forEach(team=>{
-        const loginUsed=localStorage.getItem(keyLoginUsed(team))==="1";
-        const spun=localStorage.getItem(keySpun(team))==="1";
-        const winner=localStorage.getItem(keyWinner(team))||"—";
-        const mode=getMode(team);
-        const fixedPick=getFixedPick(team);
-        const randomPick=getRandomPick(team);
+        const d = map[team] || {};
+        const loginUsed = d.loginUsed === true;
+        const spun = d.spun === true;
+        const winner = d.winner || "—";
+        const mode = d.mode || DEFAULT_MODE;
+        const fixedPick = (d.fixedPick && options.includes(d.fixedPick)) ? d.fixedPick : (TEAM_TO_PLAYER[team]||options[0]);
+        const randomPick = (d.randomPick && options.includes(d.randomPick)) ? d.randomPick : "—";
 
         const statusHtml=`
           <div>${loginUsed?pill("LOGIN USED","red"):pill("LOGIN FREE","green")}</div>
@@ -141,7 +187,7 @@
           <div class="actions">
             <button class="btn2" data-act="unlockLogin" data-team="${team}">Unlock Login</button>
             <button class="btn2" data-act="resetSpin" data-team="${team}">Reset Spin</button>
-            <button class="btn2" data-act="clearRandomPick" data-team="${team}">Clear Random</button>
+            <button class="btn2" data-act="clearRandom" data-team="${team}">Clear Random</button>
             <button class="danger" data-act="wipeTeam" data-team="${team}">Wipe Team</button>
           </div>
         `;
@@ -157,111 +203,134 @@
       });
     }
 
-    function unlockLogin(team){
-      localStorage.removeItem(keyLoginUsed(team));
-      if(localStorage.getItem(KEY_CURRENT_TEAM)===team) localStorage.removeItem(KEY_CURRENT_TEAM);
-    }
-    function resetSpin(team){
-      localStorage.removeItem(keySpun(team));
-      localStorage.removeItem(keyWinner(team));
-    }
-    function clearRandomPick(team){
-      localStorage.removeItem(keyAdminRandomPick(team));
-    }
-    function wipeTeam(team){
-      localStorage.removeItem(keyLoginUsed(team));
-      localStorage.removeItem(keySpun(team));
-      localStorage.removeItem(keyWinner(team));
-      localStorage.removeItem(keyMode(team));
-      localStorage.removeItem(keyFixedPick(team));
-      localStorage.removeItem(keyAdminRandomPick(team));
-      if(localStorage.getItem(KEY_CURRENT_TEAM)===team) localStorage.removeItem(KEY_CURRENT_TEAM);
-    }
-    function resetAll(){
-      if(!confirm("RESET ALL?")) return;
-      TEAMS.forEach(wipeTeam);
-      localStorage.removeItem(KEY_CURRENT_TEAM);
-      render();
-    }
-
-    function shuffle(arr){
-      const a=arr.slice();
-      for(let i=a.length-1;i>0;i--){
-        const j=Math.floor(Math.random()*(i+1));
-        [a[i],a[j]]=[a[j],a[i]];
+    async function setMode(team, mode){
+      await ensureTeamDoc(team);
+      const ref=teamRef(team);
+      if(mode==="fixed"){
+        await ref.set({
+          mode:"fixed",
+          randomPick:"",
+          fixedPick: TEAM_TO_PLAYER[team] || options[0],
+          updatedAt: Date.now()
+        }, { merge:true });
+      }else{
+        await ref.set({ mode:"random", updatedAt: Date.now() }, { merge:true });
       }
-      return a;
     }
 
-    function assignRandomUnique(){
-      const randomTeams=TEAMS.filter(t=>getMode(t)==="random");
-      const used=new Set();
+    async function setFixed(team, pick){
+      if(!options.includes(pick)) return;
+      await ensureTeamDoc(team);
+      await teamRef(team).set({ fixedPick: pick, updatedAt: Date.now() }, { merge:true });
+    }
 
+    async function unlockLogin(team){
+      await ensureTeamDoc(team);
+      await teamRef(team).set({ loginUsed:false, updatedAt: Date.now() }, { merge:true });
+    }
+
+    async function resetSpin(team){
+      await ensureTeamDoc(team);
+      await teamRef(team).set({ spun:false, winner:"", updatedAt: Date.now() }, { merge:true });
+    }
+
+    async function clearRandom(team){
+      await ensureTeamDoc(team);
+      await teamRef(team).set({ randomPick:"", updatedAt: Date.now() }, { merge:true });
+    }
+
+    async function wipeTeam(team){
+      await ensureTeamDoc(team);
+      await teamRef(team).set({
+        loginUsed:false,
+        spun:false,
+        winner:"",
+        mode:"fixed",
+        fixedPick: TEAM_TO_PLAYER[team] || options[0],
+        randomPick:"",
+        updatedAt: Date.now()
+      }, { merge:true });
+    }
+
+    async function resetAll(){
+      if(!confirm("RESET ALL?")) return;
+      for(const t of TEAMS) await wipeTeam(t);
+    }
+
+    async function assignRandomUnique(){
+      await ensureAll();
+
+      const snaps = await db.collection("teams").get();
+      const map = {};
+      snaps.forEach(d=> map[d.id]=d.data());
+
+      const randomTeams = TEAMS.filter(t => (map[t]?.mode || DEFAULT_MODE) === "random");
+      const used = new Set();
+
+      // keep already valid random picks
       randomTeams.forEach(t=>{
-        const pick=localStorage.getItem(keyAdminRandomPick(t));
-        if(pick&&options.includes(pick)) used.add(pick);
+        const pick = map[t]?.randomPick;
+        if(pick && options.includes(pick)) used.add(pick);
       });
 
-      const remaining=options.filter(o=>!used.has(o));
-      const pool=shuffle(remaining);
+      const remaining = options.filter(o=>!used.has(o));
+      const pool = shuffle(remaining);
 
-      randomTeams.forEach(t=>{
-        let pick=localStorage.getItem(keyAdminRandomPick(t));
-        if(pick && options.includes(pick)) return;
-        if(pool.length===0){
-          randomTeams.forEach(x=>localStorage.removeItem(keyAdminRandomPick(x)));
-          return assignRandomUnique();
+      // if not enough unique, clear all randomPick and reassign fresh
+      if(pool.length < randomTeams.filter(t=>!(map[t]?.randomPick && options.includes(map[t]?.randomPick))).length){
+        for(const t of randomTeams){
+          await teamRef(t).set({ randomPick:"", updatedAt: Date.now() }, { merge:true });
         }
-        localStorage.setItem(keyAdminRandomPick(t), pool.pop());
-      });
+        return assignRandomUnique();
+      }
 
-      render();
+      for(const t of randomTeams){
+        const current = map[t]?.randomPick;
+        if(current && options.includes(current)) continue;
+        const pick = pool.pop();
+        await teamRef(t).set({ randomPick: pick, updatedAt: Date.now() }, { merge:true });
+      }
+
       alert("Assigned unique RANDOM winners.");
     }
 
-    document.addEventListener("change",(e)=>{
+    refreshBtn.addEventListener("click", async ()=>{ await ensureAll(); });
+
+    forceLogoutBtn.addEventListener("click", ()=>{ alert("Force logout is per-device now. Teams can just close tab."); });
+
+    resetAllBtn.addEventListener("click", resetAll);
+    assignRandomBtn.addEventListener("click", assignRandomUnique);
+
+    document.addEventListener("change", async (e)=>{
       const el=e.target;
       const act=el?.dataset?.act;
       const team=el?.dataset?.team;
       if(!act||!team) return;
 
       if(act==="setMode"){
-        const newMode=el.value==="random"?"random":"fixed";
-        localStorage.setItem(keyMode(team),newMode);
-        if(newMode==="fixed") localStorage.removeItem(keyAdminRandomPick(team));
-        if(newMode==="fixed" && !options.includes(localStorage.getItem(keyFixedPick(team)))) {
-          localStorage.setItem(keyFixedPick(team), options[0]);
-        }
-        render();
+        const newMode = el.value==="random" ? "random" : "fixed";
+        await setMode(team, newMode);
       }
-
       if(act==="setFixed"){
-        const pick=el.value;
-        if(options.includes(pick)) localStorage.setItem(keyFixedPick(team),pick);
-        render();
+        await setFixed(team, el.value);
       }
     });
 
-    document.addEventListener("click",(e)=>{
+    document.addEventListener("click", async (e)=>{
       const btn=e.target.closest("button");
       if(!btn) return;
 
       const act=btn.dataset.act;
       const team=btn.dataset.team;
 
-      if(act==="unlockLogin"){unlockLogin(team);render();}
-      if(act==="resetSpin"){resetSpin(team);render();}
-      if(act==="clearRandomPick"){clearRandomPick(team);render();}
-      if(act==="wipeTeam"){if(confirm(`Wipe ${team}?`)){wipeTeam(team);render();}}
+      if(act==="unlockLogin") await unlockLogin(team);
+      if(act==="resetSpin") await resetSpin(team);
+      if(act==="clearRandom") await clearRandom(team);
+      if(act==="wipeTeam"){ if(confirm(`Wipe ${team}?`)) await wipeTeam(team); }
     });
 
-    refreshBtn.addEventListener("click",render);
-    forceLogoutBtn.addEventListener("click",()=>{localStorage.removeItem(KEY_CURRENT_TEAM);alert("Forced logout");});
-    resetAllBtn.addEventListener("click",resetAll);
-    assignRandomBtn.addEventListener("click",assignRandomUnique);
-
-    function showLock(){lockCard.style.display="block";adminCard.style.display="none";}
-    function showAdmin(){lockCard.style.display="none";adminCard.style.display="block";render();}
+    function showLock(){ lockCard.style.display="block"; adminCard.style.display="none"; }
+    function showAdmin(){ lockCard.style.display="none"; adminCard.style.display="block"; }
 
     function unlock(){
       const pin=(pinInput.value||"").trim();
@@ -269,16 +338,21 @@
         localStorage.setItem(ADMIN_UNLOCK_KEY,"1");
         pinErr.style.display="none";
         showAdmin();
+        ensureAll().then(listenAll);
       }else{
         pinErr.style.display="block";
       }
     }
 
-    pinBtn.addEventListener("click",unlock);
-    pinInput.addEventListener("keydown",(e)=>{if(e.key==="Enter")unlock();});
+    pinBtn.addEventListener("click", unlock);
+    pinInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter") unlock(); });
 
-    if(localStorage.getItem(ADMIN_UNLOCK_KEY)==="1") showAdmin();
-    else showLock();
+    if(localStorage.getItem(ADMIN_UNLOCK_KEY)==="1"){
+      showAdmin();
+      ensureAll().then(listenAll);
+    }else{
+      showLock();
+    }
   </script>
 </body>
 </html>
