@@ -8,7 +8,6 @@
     body{font-family:Arial,sans-serif;background:#f8fafc;padding:18px}
     .card{max-width:1100px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:18px;box-shadow:0 4px 14px rgba(0,0,0,.06)}
     h1{margin:0 0 8px;font-size:20px}
-    .muted{color:#6b7280;font-size:14px;margin:0}
     .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}
     button{padding:10px 14px;border:0;border-radius:10px;cursor:pointer;font-size:14px}
     .btn{background:#111827;color:#fff}
@@ -36,7 +35,7 @@
       <input id="pinInput" type="password" placeholder="Admin PIN" />
       <button class="btn" id="pinBtn">Unlock</button>
     </div>
-    <p id="pinErr" class="muted" style="color:#dc2626;font-weight:800;display:none;margin-top:10px;">Wrong PIN</p>
+    <p id="pinErr" style="color:#dc2626;font-weight:800;display:none;margin-top:10px;">Wrong PIN</p>
   </div>
 
   <div class="card" id="adminCard" style="display:none;">
@@ -66,9 +65,8 @@
 
   <script>
     const ADMIN_PIN="1234";
-
-    const TEAMS=["TS","TPS","TD","TLK","TG"];
-    const options=["Selva","Navinkanth","Divagar","Ilayaraja","Janaster"];
+    const TEAMS=["TS","TPS","TD","TLK","TG","TT"];
+    const options=["Selva","Navinkanth","Divagar","Ilayaraja","Janaster","Father of Rakshan"];
 
     const KEY_CURRENT_TEAM="pollwheel_current_team";
 
@@ -76,9 +74,9 @@
     const keySpun=(t)=>`pollwheel_spun_${t}`;
     const keyWinner=(t)=>`pollwheel_winner_${t}`;
 
-    const keyMode=(t)=>`pollwheel_admin_mode_${t}`;                  // fixed|random
+    const keyMode=(t)=>`pollwheel_admin_mode_${t}`;
     const keyFixedPick=(t)=>`pollwheel_admin_fixed_pick_${t}`;
-    const keyAdminRandomPick=(t)=>`pollwheel_admin_random_pick_${t}`; // pre-assigned unique random
+    const keyAdminRandomPick=(t)=>`pollwheel_admin_random_pick_${t}`;
 
     const DEFAULT_MODE="fixed";
     const ADMIN_UNLOCK_KEY="pollwheel_admin_unlocked";
@@ -96,7 +94,6 @@
     const assignRandomBtn=document.getElementById("assignRandomBtn");
 
     const pill=(txt,kind)=>`<span class="pill ${kind}">${txt}</span>`;
-
     const getMode=(t)=>localStorage.getItem(keyMode(t))||DEFAULT_MODE;
 
     function getFixedPick(t){
@@ -133,7 +130,6 @@
               <option value="fixed" ${mode==="fixed"?"selected":""}>FIXED</option>
               <option value="random" ${mode==="random"?"selected":""}>RANDOM</option>
             </select>
-
             <select data-act="setFixed" data-team="${team}" ${mode==="random"?"disabled":""}>
               ${options.map(o=>`<option value="${o}" ${o===fixedPick?"selected":""}>${o}</option>`).join("")}
             </select>
@@ -197,12 +193,10 @@
       return a;
     }
 
-    // ✅ Assign UNIQUE random winners (no duplicates)
     function assignRandomUnique(){
       const randomTeams=TEAMS.filter(t=>getMode(t)==="random");
       const used=new Set();
 
-      // keep already assigned random picks (avoid changing them unless conflict)
       randomTeams.forEach(t=>{
         const pick=localStorage.getItem(keyAdminRandomPick(t));
         if(pick&&options.includes(pick)) used.add(pick);
@@ -215,7 +209,6 @@
         let pick=localStorage.getItem(keyAdminRandomPick(t));
         if(pick && options.includes(pick)) return;
         if(pool.length===0){
-          // not enough unique names, clear all random picks and re-assign
           randomTeams.forEach(x=>localStorage.removeItem(keyAdminRandomPick(x)));
           return assignRandomUnique();
         }

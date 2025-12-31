@@ -29,9 +29,9 @@
 
   <div id="loginView" class="card" style="display:none;">
     <h1>Team Login</h1>
-    <p class="muted">TS, TPS, TD, TLK, TG</p>
+    <p class="muted">TS, TPS, TD, TLK, TG, TT</p>
     <label for="teamInput">Team Code</label>
-    <input id="teamInput" placeholder="TS / TPS / TD / TLK / TG" autocomplete="off" />
+    <input id="teamInput" placeholder="TS / TPS / TD / TLK / TG / TT" autocomplete="off" />
     <div class="row">
       <button id="loginBtn" class="btn">Login</button>
     </div>
@@ -57,18 +57,41 @@
   </div>
 
   <script>
-    const TEAM_TO_PLAYER={TS:"Selva",TPS:"Navinkanth",TD:"Divagar",TLK:"Ilayaraja",TG:"Janaster"};
-    const options=["Selva","Navinkanth","Divagar","Ilayaraja","Janaster"];
-    const sliceColors=["#facc15","#ec4899","#92400e","#ef4444","#8b5cf6"];
+    const TEAM_TO_PLAYER={
+      TS:"Selva",
+      TPS:"Navinkanth",
+      TD:"Divagar",
+      TLK:"Ilayaraja",
+      TG:"Janaster",
+      TT:"Father of Rakshan"
+    };
+
+    const options=[
+      "Selva",
+      "Navinkanth",
+      "Divagar",
+      "Ilayaraja",
+      "Janaster",
+      "Father of Rakshan"
+    ];
+
+    const sliceColors=[
+      "#facc15",
+      "#ec4899",
+      "#92400e",
+      "#ef4444",
+      "#8b5cf6",
+      "#0ea5e9"
+    ];
 
     const KEY_CURRENT_TEAM="pollwheel_current_team";
     const keyLoginUsed=(t)=>`pollwheel_login_used_${t}`;
     const keySpun=(t)=>`pollwheel_spun_${t}`;
     const keyWinner=(t)=>`pollwheel_winner_${t}`;
 
-    const keyMode=(t)=>`pollwheel_admin_mode_${t}`;                 // fixed|random
-    const keyFixedPick=(t)=>`pollwheel_admin_fixed_pick_${t}`;      // fixed winner
-    const keyAdminRandomPick=(t)=>`pollwheel_admin_random_pick_${t}`; // random winner pre-assigned by admin
+    const keyMode=(t)=>`pollwheel_admin_mode_${t}`;
+    const keyFixedPick=(t)=>`pollwheel_admin_fixed_pick_${t}`;
+    const keyAdminRandomPick=(t)=>`pollwheel_admin_random_pick_${t}`;
 
     const DEFAULT_MODE="fixed";
 
@@ -101,6 +124,7 @@
       teamInput.value="";
       teamInput.focus();
     }
+
     function showWheel(team){
       loginView.style.display="none";
       wheelView.style.display="block";
@@ -117,7 +141,7 @@
         return;
       }
       if(localStorage.getItem(keyLoginUsed(team))==="1"){
-        loginError.textContent="Login locked (admin reset needed)";
+        loginError.textContent="One team one time logged";
         loginError.style.display="block";
         return;
       }
@@ -184,7 +208,6 @@
       const targetAngle=finalAngleBase+extraSpins*TAU;
       const start=performance.now();
       const duration=5200;
-
       const easeOutCubic=(t)=>1-Math.pow(1-t,3);
 
       function frame(now){
@@ -206,15 +229,17 @@
     function getMode(team){
       return localStorage.getItem(keyMode(team))||DEFAULT_MODE;
     }
+
     function getFixedWinner(team){
       const pick=localStorage.getItem(keyFixedPick(team));
       if(pick&&options.includes(pick))return pick;
       return TEAM_TO_PLAYER[team];
     }
+
     function getRandomWinner(team){
       const pick=localStorage.getItem(keyAdminRandomPick(team));
       if(pick&&options.includes(pick))return pick;
-      return null; // admin must assign to prevent duplicates
+      return null;
     }
 
     function applyState(team){
