@@ -5,49 +5,48 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Admin Control - Poll Wheel</title>
   <style>
-    body { font-family: Arial, sans-serif; background:#f8fafc; padding:18px; }
-    .card { max-width: 1100px; margin:0 auto; background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:18px; box-shadow:0 4px 14px rgba(0,0,0,0.06); }
-    h1 { margin:0 0 8px; font-size:20px; }
-    .muted { color:#6b7280; font-size:14px; margin:0; }
-    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; }
-    button { padding:10px 14px; border:0; border-radius:10px; cursor:pointer; font-size:14px; }
-    .btn { background:#111827; color:#fff; }
-    .btn2 { background:#e5e7eb; }
-    .danger { background:#dc2626; color:#fff; }
-    .ok { background:#16a34a; color:#fff; }
-    .hr { height:1px; background:#e5e7eb; margin:14px 0; }
-    input, select { padding:10px 12px; border:1px solid #d1d5db; border-radius:10px; font-size:14px; }
-    table { width:100%; border-collapse:collapse; margin-top:12px; }
-    th, td { border-bottom:1px solid #e5e7eb; padding:10px; text-align:left; font-size:14px; vertical-align:top; }
-    th { background:#f8fafc; font-weight:800; }
-    .pill { display:inline-block; padding:4px 10px; border-radius:999px; font-weight:800; font-size:12px; }
-    .pill.gray { background:#e5e7eb; }
-    .pill.green { background:#dcfce7; color:#166534; }
-    .pill.red { background:#fee2e2; color:#991b1b; }
-    .actions { display:flex; gap:8px; flex-wrap:wrap; }
-    .small { font-size:12px; color:#6b7280; margin-top:4px; }
+    body{font-family:Arial,sans-serif;background:#f8fafc;padding:18px}
+    .card{max-width:1100px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:18px;box-shadow:0 4px 14px rgba(0,0,0,.06)}
+    h1{margin:0 0 8px;font-size:20px}
+    .muted{color:#6b7280;font-size:14px;margin:0}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}
+    button{padding:10px 14px;border:0;border-radius:10px;cursor:pointer;font-size:14px}
+    .btn{background:#111827;color:#fff}
+    .btn2{background:#e5e7eb}
+    .danger{background:#dc2626;color:#fff}
+    .ok{background:#16a34a;color:#fff}
+    .hr{height:1px;background:#e5e7eb;margin:14px 0}
+    input,select{padding:10px 12px;border:1px solid #d1d5db;border-radius:10px;font-size:14px}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{border-bottom:1px solid #e5e7eb;padding:10px;text-align:left;font-size:14px;vertical-align:top}
+    th{background:#f8fafc;font-weight:800}
+    .pill{display:inline-block;padding:4px 10px;border-radius:999px;font-weight:800;font-size:12px}
+    .pill.gray{background:#e5e7eb}
+    .pill.green{background:#dcfce7;color:#166534}
+    .pill.red{background:#fee2e2;color:#991b1b}
+    .actions{display:flex;gap:8px;flex-wrap:wrap}
+    .small{font-size:12px;color:#6b7280;margin-top:4px}
   </style>
 </head>
 <body>
 
   <div class="card" id="lockCard" style="display:none;">
     <h1>Admin Login</h1>
-    <p class="muted">Enter admin PIN to access controls.</p>
     <div class="row">
       <input id="pinInput" type="password" placeholder="Admin PIN" />
       <button class="btn" id="pinBtn">Unlock</button>
     </div>
-    <p id="pinErr" class="muted" style="color:#dc2626; font-weight:800; display:none; margin-top:10px;">Wrong PIN</p>
+    <p id="pinErr" class="muted" style="color:#dc2626;font-weight:800;display:none;margin-top:10px;">Wrong PIN</p>
   </div>
 
   <div class="card" id="adminCard" style="display:none;">
     <h1>Admin Control Panel</h1>
-    <p class="muted">Admin decides per team: FIXED or RANDOM. Teams spin once only.</p>
 
     <div class="row">
       <button class="btn" id="refreshBtn">Refresh</button>
-      <button class="btn2" id="forceLogoutBtn">Force Logout (this browser)</button>
-      <button class="danger" id="resetAllBtn">RESET ALL (Danger)</button>
+      <button class="ok" id="assignRandomBtn">Assign RANDOM Winners (No Duplicates)</button>
+      <button class="btn2" id="forceLogoutBtn">Force Logout</button>
+      <button class="danger" id="resetAllBtn">RESET ALL</button>
     </div>
 
     <div class="hr"></div>
@@ -56,86 +55,79 @@
       <thead>
         <tr>
           <th style="width:80px;">Team</th>
-          <th style="width:260px;">Admin Mode</th>
+          <th style="width:320px;">Admin Mode</th>
           <th>Team Status</th>
-          <th style="width:380px;">Actions</th>
+          <th style="width:360px;">Actions</th>
         </tr>
       </thead>
       <tbody id="tbody"></tbody>
     </table>
-
-    <div class="hr"></div>
-    <p class="muted">
-      Note: This admin page controls localStorage in this browser/device only.
-      If you need multi-device control, you need a backend (Firebase/PHP/Node).
-    </p>
   </div>
 
   <script>
-    // 🔐 CHANGE THIS PIN
-    const ADMIN_PIN = "1234";
+    const ADMIN_PIN="1234";
 
-    // Teams/players must match index.html
-    const TEAMS = ["TS","TPS","TD","TLK","TG"];
-    const options = ["Selva","Navinkanth","Divagar","Ilayaraja","Janaster"];
+    const TEAMS=["TS","TPS","TD","TLK","TG"];
+    const options=["Selva","Navinkanth","Divagar","Ilayaraja","Janaster"];
 
-    // Keys (must match index.html)
-    const KEY_CURRENT_TEAM = "pollwheel_current_team";
+    const KEY_CURRENT_TEAM="pollwheel_current_team";
 
-    const keyLoginUsed   = (team) => `pollwheel_login_used_${team}`;
-    const keySpun        = (team) => `pollwheel_spun_${team}`;
-    const keyWinner      = (team) => `pollwheel_winner_${team}`;
+    const keyLoginUsed=(t)=>`pollwheel_login_used_${t}`;
+    const keySpun=(t)=>`pollwheel_spun_${t}`;
+    const keyWinner=(t)=>`pollwheel_winner_${t}`;
 
-    const keyMode        = (team) => `pollwheel_admin_mode_${team}`;       // "fixed" | "random"
-    const keyFixedPick   = (team) => `pollwheel_admin_fixed_pick_${team}`; // one of options
+    const keyMode=(t)=>`pollwheel_admin_mode_${t}`;                  // fixed|random
+    const keyFixedPick=(t)=>`pollwheel_admin_fixed_pick_${t}`;
+    const keyAdminRandomPick=(t)=>`pollwheel_admin_random_pick_${t}`; // pre-assigned unique random
 
-    const DEFAULT_MODE = "fixed";
-    const ADMIN_UNLOCK_KEY = "pollwheel_admin_unlocked";
+    const DEFAULT_MODE="fixed";
+    const ADMIN_UNLOCK_KEY="pollwheel_admin_unlocked";
 
-    const lockCard = document.getElementById("lockCard");
-    const adminCard = document.getElementById("adminCard");
-    const pinInput = document.getElementById("pinInput");
-    const pinBtn = document.getElementById("pinBtn");
-    const pinErr = document.getElementById("pinErr");
+    const lockCard=document.getElementById("lockCard");
+    const adminCard=document.getElementById("adminCard");
+    const pinInput=document.getElementById("pinInput");
+    const pinBtn=document.getElementById("pinBtn");
+    const pinErr=document.getElementById("pinErr");
 
-    const tbody = document.getElementById("tbody");
-    const refreshBtn = document.getElementById("refreshBtn");
-    const forceLogoutBtn = document.getElementById("forceLogoutBtn");
-    const resetAllBtn = document.getElementById("resetAllBtn");
+    const tbody=document.getElementById("tbody");
+    const refreshBtn=document.getElementById("refreshBtn");
+    const forceLogoutBtn=document.getElementById("forceLogoutBtn");
+    const resetAllBtn=document.getElementById("resetAllBtn");
+    const assignRandomBtn=document.getElementById("assignRandomBtn");
 
-    function pill(text, kind) {
-      return `<span class="pill ${kind}">${text}</span>`;
+    const pill=(txt,kind)=>`<span class="pill ${kind}">${txt}</span>`;
+
+    const getMode=(t)=>localStorage.getItem(keyMode(t))||DEFAULT_MODE;
+
+    function getFixedPick(t){
+      const pick=localStorage.getItem(keyFixedPick(t));
+      return (pick&&options.includes(pick))?pick:options[0];
     }
 
-    function getMode(team) {
-      return localStorage.getItem(keyMode(team)) || DEFAULT_MODE;
+    function getRandomPick(t){
+      const pick=localStorage.getItem(keyAdminRandomPick(t));
+      return (pick&&options.includes(pick))?pick:"—";
     }
 
-    function getFixedPick(team) {
-      const pick = localStorage.getItem(keyFixedPick(team));
-      return (pick && options.includes(pick)) ? pick : options[0];
-    }
+    function render(){
+      tbody.innerHTML="";
+      TEAMS.forEach(team=>{
+        const loginUsed=localStorage.getItem(keyLoginUsed(team))==="1";
+        const spun=localStorage.getItem(keySpun(team))==="1";
+        const winner=localStorage.getItem(keyWinner(team))||"—";
+        const mode=getMode(team);
+        const fixedPick=getFixedPick(team);
+        const randomPick=getRandomPick(team);
 
-    function render() {
-      tbody.innerHTML = "";
-
-      TEAMS.forEach(team => {
-        const loginUsed = localStorage.getItem(keyLoginUsed(team)) === "1";
-        const spun = localStorage.getItem(keySpun(team)) === "1";
-        const winner = localStorage.getItem(keyWinner(team)) || "—";
-
-        const mode = getMode(team);
-        const fixedPick = getFixedPick(team);
-
-        const statusHtml = `
-          <div>${loginUsed ? pill("LOGIN USED", "red") : pill("LOGIN FREE", "green")}</div>
+        const statusHtml=`
+          <div>${loginUsed?pill("LOGIN USED","red"):pill("LOGIN FREE","green")}</div>
           <div style="margin-top:6px;">
-            ${spun ? pill("SPUN", "green") : pill("NOT SPUN", "gray")}
+            ${spun?pill("SPUN","green"):pill("NOT SPUN","gray")}
             <div class="small">Winner: <b>${winner}</b></div>
           </div>
         `;
 
-        const modeHtml = `
+        const modeHtml=`
           <div class="row" style="margin:0;">
             <select data-act="setMode" data-team="${team}">
               <option value="fixed" ${mode==="fixed"?"selected":""}>FIXED</option>
@@ -143,26 +135,23 @@
             </select>
 
             <select data-act="setFixed" data-team="${team}" ${mode==="random"?"disabled":""}>
-              ${options.map(o => `<option value="${o}" ${o===fixedPick?"selected":""}>${o}</option>`).join("")}
+              ${options.map(o=>`<option value="${o}" ${o===fixedPick?"selected":""}>${o}</option>`).join("")}
             </select>
           </div>
-          <div class="small">If mode = RANDOM, fixed winner dropdown is disabled.</div>
+          <div class="small">Random Pick: <b>${randomPick}</b></div>
         `;
 
-        const actionsHtml = `
+        const actionsHtml=`
           <div class="actions">
             <button class="btn2" data-act="unlockLogin" data-team="${team}">Unlock Login</button>
             <button class="btn2" data-act="resetSpin" data-team="${team}">Reset Spin</button>
+            <button class="btn2" data-act="clearRandomPick" data-team="${team}">Clear Random</button>
             <button class="danger" data-act="wipeTeam" data-team="${team}">Wipe Team</button>
-          </div>
-          <div class="small">
-            Unlock Login = allow team to login again.
-            Reset Spin = allow team to spin again (but login stays locked unless you unlock).
           </div>
         `;
 
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
+        const tr=document.createElement("tr");
+        tr.innerHTML=`
           <td><b>${team}</b></td>
           <td>${modeHtml}</td>
           <td>${statusHtml}</td>
@@ -172,103 +161,130 @@
       });
     }
 
-    function unlockLogin(team) {
+    function unlockLogin(team){
       localStorage.removeItem(keyLoginUsed(team));
-      if (localStorage.getItem(KEY_CURRENT_TEAM) === team) localStorage.removeItem(KEY_CURRENT_TEAM);
+      if(localStorage.getItem(KEY_CURRENT_TEAM)===team) localStorage.removeItem(KEY_CURRENT_TEAM);
     }
-
-    function resetSpin(team) {
+    function resetSpin(team){
       localStorage.removeItem(keySpun(team));
       localStorage.removeItem(keyWinner(team));
     }
-
-    function wipeTeam(team) {
+    function clearRandomPick(team){
+      localStorage.removeItem(keyAdminRandomPick(team));
+    }
+    function wipeTeam(team){
       localStorage.removeItem(keyLoginUsed(team));
       localStorage.removeItem(keySpun(team));
       localStorage.removeItem(keyWinner(team));
       localStorage.removeItem(keyMode(team));
       localStorage.removeItem(keyFixedPick(team));
-      if (localStorage.getItem(KEY_CURRENT_TEAM) === team) localStorage.removeItem(KEY_CURRENT_TEAM);
+      localStorage.removeItem(keyAdminRandomPick(team));
+      if(localStorage.getItem(KEY_CURRENT_TEAM)===team) localStorage.removeItem(KEY_CURRENT_TEAM);
     }
-
-    function resetAll() {
-      if (!confirm("RESET ALL teams? This clears login/spin + admin settings for all.")) return;
+    function resetAll(){
+      if(!confirm("RESET ALL?")) return;
       TEAMS.forEach(wipeTeam);
       localStorage.removeItem(KEY_CURRENT_TEAM);
       render();
     }
 
-    // Handle dropdown changes + button actions
-    document.addEventListener("change", (e) => {
-      const el = e.target;
-      if (!(el instanceof HTMLElement)) return;
+    function shuffle(arr){
+      const a=arr.slice();
+      for(let i=a.length-1;i>0;i--){
+        const j=Math.floor(Math.random()*(i+1));
+        [a[i],a[j]]=[a[j],a[i]];
+      }
+      return a;
+    }
 
-      const act = el.dataset.act;
-      const team = el.dataset.team;
-      if (!act || !team) return;
+    // ✅ Assign UNIQUE random winners (no duplicates)
+    function assignRandomUnique(){
+      const randomTeams=TEAMS.filter(t=>getMode(t)==="random");
+      const used=new Set();
 
-      if (act === "setMode") {
-        const newMode = el.value === "random" ? "random" : "fixed";
-        localStorage.setItem(keyMode(team), newMode);
+      // keep already assigned random picks (avoid changing them unless conflict)
+      randomTeams.forEach(t=>{
+        const pick=localStorage.getItem(keyAdminRandomPick(t));
+        if(pick&&options.includes(pick)) used.add(pick);
+      });
 
-        // if fixed mode and no fixed pick exists, set default
-        if (newMode === "fixed" && !options.includes(localStorage.getItem(keyFixedPick(team)))) {
+      const remaining=options.filter(o=>!used.has(o));
+      const pool=shuffle(remaining);
+
+      randomTeams.forEach(t=>{
+        let pick=localStorage.getItem(keyAdminRandomPick(t));
+        if(pick && options.includes(pick)) return;
+        if(pool.length===0){
+          // not enough unique names, clear all random picks and re-assign
+          randomTeams.forEach(x=>localStorage.removeItem(keyAdminRandomPick(x)));
+          return assignRandomUnique();
+        }
+        localStorage.setItem(keyAdminRandomPick(t), pool.pop());
+      });
+
+      render();
+      alert("Assigned unique RANDOM winners.");
+    }
+
+    document.addEventListener("change",(e)=>{
+      const el=e.target;
+      const act=el?.dataset?.act;
+      const team=el?.dataset?.team;
+      if(!act||!team) return;
+
+      if(act==="setMode"){
+        const newMode=el.value==="random"?"random":"fixed";
+        localStorage.setItem(keyMode(team),newMode);
+        if(newMode==="fixed") localStorage.removeItem(keyAdminRandomPick(team));
+        if(newMode==="fixed" && !options.includes(localStorage.getItem(keyFixedPick(team)))) {
           localStorage.setItem(keyFixedPick(team), options[0]);
         }
         render();
       }
 
-      if (act === "setFixed") {
-        const pick = el.value;
-        if (options.includes(pick)) localStorage.setItem(keyFixedPick(team), pick);
+      if(act==="setFixed"){
+        const pick=el.value;
+        if(options.includes(pick)) localStorage.setItem(keyFixedPick(team),pick);
         render();
       }
     });
 
-    document.addEventListener("click", (e) => {
-      const btn = e.target.closest("button");
-      if (!btn) return;
+    document.addEventListener("click",(e)=>{
+      const btn=e.target.closest("button");
+      if(!btn) return;
 
-      const act = btn.dataset.act;
-      const team = btn.dataset.team;
+      const act=btn.dataset.act;
+      const team=btn.dataset.team;
 
-      if (act === "unlockLogin") { unlockLogin(team); render(); }
-      if (act === "resetSpin") { resetSpin(team); render(); }
-      if (act === "wipeTeam") {
-        if (!confirm(`Wipe ALL data for ${team}?`)) return;
-        wipeTeam(team); render();
-      }
+      if(act==="unlockLogin"){unlockLogin(team);render();}
+      if(act==="resetSpin"){resetSpin(team);render();}
+      if(act==="clearRandomPick"){clearRandomPick(team);render();}
+      if(act==="wipeTeam"){if(confirm(`Wipe ${team}?`)){wipeTeam(team);render();}}
     });
 
-    refreshBtn.addEventListener("click", render);
+    refreshBtn.addEventListener("click",render);
+    forceLogoutBtn.addEventListener("click",()=>{localStorage.removeItem(KEY_CURRENT_TEAM);alert("Forced logout");});
+    resetAllBtn.addEventListener("click",resetAll);
+    assignRandomBtn.addEventListener("click",assignRandomUnique);
 
-    forceLogoutBtn.addEventListener("click", () => {
-      localStorage.removeItem(KEY_CURRENT_TEAM);
-      alert("Forced logout for this browser session.");
-    });
+    function showLock(){lockCard.style.display="block";adminCard.style.display="none";}
+    function showAdmin(){lockCard.style.display="none";adminCard.style.display="block";render();}
 
-    resetAllBtn.addEventListener("click", resetAll);
-
-    // Admin unlock
-    function showLock() { lockCard.style.display = "block"; adminCard.style.display = "none"; }
-    function showAdmin() { lockCard.style.display = "none"; adminCard.style.display = "block"; render(); }
-
-    function unlock() {
-      const pin = (pinInput.value || "").trim();
-      if (pin === ADMIN_PIN) {
-        localStorage.setItem(ADMIN_UNLOCK_KEY, "1");
-        pinErr.style.display = "none";
+    function unlock(){
+      const pin=(pinInput.value||"").trim();
+      if(pin===ADMIN_PIN){
+        localStorage.setItem(ADMIN_UNLOCK_KEY,"1");
+        pinErr.style.display="none";
         showAdmin();
-      } else {
-        pinErr.style.display = "block";
+      }else{
+        pinErr.style.display="block";
       }
     }
 
-    pinBtn.addEventListener("click", unlock);
-    pinInput.addEventListener("keydown", (e) => { if (e.key === "Enter") unlock(); });
+    pinBtn.addEventListener("click",unlock);
+    pinInput.addEventListener("keydown",(e)=>{if(e.key==="Enter")unlock();});
 
-    // Boot
-    if (localStorage.getItem(ADMIN_UNLOCK_KEY) === "1") showAdmin();
+    if(localStorage.getItem(ADMIN_UNLOCK_KEY)==="1") showAdmin();
     else showLock();
   </script>
 </body>

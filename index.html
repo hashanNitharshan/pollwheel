@@ -5,55 +5,42 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Team Poll Wheel</title>
   <style>
-    body { font-family: Arial, sans-serif; background:#f8fafc; display:flex; justify-content:center; padding:18px; }
-    .card { width: min(640px, 100%); background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:18px; box-shadow:0 4px 14px rgba(0,0,0,0.06); }
-    h1 { margin:0 0 8px; font-size:20px; }
-    .muted { color:#6b7280; font-size:14px; margin:0; }
-    label { display:block; margin-top:12px; font-weight:700; }
-    input { width:100%; padding:12px; border:1px solid #d1d5db; border-radius:10px; font-size:16px; margin-top:8px; }
-    button { padding:12px 16px; border:0; border-radius:10px; cursor:pointer; font-size:16px; }
-    .btn { background:#111827; color:#fff; }
-    .btn2 { background:#e5e7eb; }
-    .btn:disabled { opacity:.55; cursor:not-allowed; }
-    .row { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
-    .error { color:#dc2626; font-weight:700; margin-top:10px; display:none; }
-
-    .wrap { display:flex; flex-direction:column; align-items:center; gap:12px; margin-top:14px; }
-    .arrow { width:0; height:0; border-left:14px solid transparent; border-right:14px solid transparent; border-bottom:22px solid #e11d48; margin-bottom:-6px; }
-    canvas { border-radius:50%; border:6px solid #222; background:#fff; }
-    #result { font-size:18px; font-weight:900; }
-    .topbar { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap; }
-    .badge { background:#111827; color:#fff; padding:6px 10px; border-radius:999px; font-size:14px; font-weight:800; }
-    .hr { height:1px; background:#e5e7eb; margin:14px 0; }
+    body{font-family:Arial,sans-serif;background:#f8fafc;display:flex;justify-content:center;padding:18px}
+    .card{width:min(640px,100%);background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:18px;box-shadow:0 4px 14px rgba(0,0,0,.06)}
+    h1{margin:0 0 8px;font-size:20px}
+    .muted{color:#6b7280;font-size:14px;margin:0}
+    label{display:block;margin-top:12px;font-weight:700}
+    input{width:100%;padding:12px;border:1px solid #d1d5db;border-radius:10px;font-size:16px;margin-top:8px}
+    button{padding:12px 16px;border:0;border-radius:10px;cursor:pointer;font-size:16px}
+    .btn{background:#111827;color:#fff}
+    .btn2{background:#e5e7eb}
+    .btn:disabled{opacity:.55;cursor:not-allowed}
+    .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    .error{color:#dc2626;font-weight:700;margin-top:10px;display:none}
+    .wrap{display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:14px}
+    .arrow{width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-bottom:22px solid #e11d48;margin-bottom:-6px}
+    canvas{border-radius:50%;border:6px solid #222;background:#fff}
+    #result{font-size:18px;font-weight:900}
+    .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .badge{background:#111827;color:#fff;padding:6px 10px;border-radius:999px;font-size:14px;font-weight:800}
   </style>
 </head>
 <body>
 
-  <!-- LOGIN -->
   <div id="loginView" class="card" style="display:none;">
     <h1>Team Login</h1>
-    <p class="muted">Enter: TS, TPS, TD, TLK, TG</p>
-
+    <p class="muted">TS, TPS, TD, TLK, TG</p>
     <label for="teamInput">Team Code</label>
     <input id="teamInput" placeholder="TS / TPS / TD / TLK / TG" autocomplete="off" />
-
     <div class="row">
       <button id="loginBtn" class="btn">Login</button>
     </div>
-
     <div id="loginError" class="error"></div>
-
-    <div class="hr"></div>
-   
   </div>
 
-  <!-- WHEEL -->
   <div id="wheelView" class="card" style="display:none;">
     <div class="topbar">
-      <div>
-        <h1 style="margin:0;">Poll Wheel</h1>
-       
-      </div>
+      <div><h1 style="margin:0;">Poll Wheel</h1></div>
       <div class="row" style="margin:0;">
         <span id="teamBadge" class="badge">TEAM: —</span>
         <button id="logoutBtn" class="btn2" type="button">Logout</button>
@@ -63,281 +50,234 @@
     <div class="wrap">
       <div class="arrow"></div>
       <canvas id="wheel" width="420" height="420"></canvas>
-
       <button id="spinBtn" class="btn">SPIN (ONE TIME)</button>
-
       <div id="result">Result: —</div>
       <div id="status" class="muted"></div>
-      <div id="modeInfo" class="muted"></div>
     </div>
   </div>
 
   <script>
-    // Teams and players
-    const TEAM_TO_PLAYER = {
-      TS:  "Selva",
-      TPS: "Navinkanth",
-      TD:  "Divagar",
-      TLK: "Ilayaraja",
-      TG:  "Janaster"
-    };
+    const TEAM_TO_PLAYER={TS:"Selva",TPS:"Navinkanth",TD:"Divagar",TLK:"Ilayaraja",TG:"Janaster"};
+    const options=["Selva","Navinkanth","Divagar","Ilayaraja","Janaster"];
+    const sliceColors=["#facc15","#ec4899","#92400e","#ef4444","#8b5cf6"];
 
-    const options = ["Selva","Navinkanth","Divagar","Ilayaraja","Janaster"];
+    const KEY_CURRENT_TEAM="pollwheel_current_team";
+    const keyLoginUsed=(t)=>`pollwheel_login_used_${t}`;
+    const keySpun=(t)=>`pollwheel_spun_${t}`;
+    const keyWinner=(t)=>`pollwheel_winner_${t}`;
 
-    const sliceColors = [
-      "#facc15", // Selva
-      "#ec4899", // Navinkanth
-      "#92400e", // Divagar
-      "#ef4444", // Ilayaraja
-      "#8b5cf6"  // Janaster
-    ];
+    const keyMode=(t)=>`pollwheel_admin_mode_${t}`;                 // fixed|random
+    const keyFixedPick=(t)=>`pollwheel_admin_fixed_pick_${t}`;      // fixed winner
+    const keyAdminRandomPick=(t)=>`pollwheel_admin_random_pick_${t}`; // random winner pre-assigned by admin
 
-    // -------- Storage keys (TEAM PAGE) --------
-    const KEY_CURRENT_TEAM = "pollwheel_current_team";
+    const DEFAULT_MODE="fixed";
 
-    const keyLoginUsed   = (team) => `pollwheel_login_used_${team}`;   // team login used (permanent until admin resets)
-    const keySpun        = (team) => `pollwheel_spun_${team}`;         // team spun once
-    const keyWinner      = (team) => `pollwheel_winner_${team}`;       // team winner locked
+    const loginView=document.getElementById("loginView");
+    const wheelView=document.getElementById("wheelView");
+    const teamInput=document.getElementById("teamInput");
+    const loginBtn=document.getElementById("loginBtn");
+    const loginError=document.getElementById("loginError");
+    const teamBadge=document.getElementById("teamBadge");
+    const logoutBtn=document.getElementById("logoutBtn");
+    const canvas=document.getElementById("wheel");
+    const ctx=canvas.getContext("2d");
+    const spinBtn=document.getElementById("spinBtn");
+    const resultEl=document.getElementById("result");
+    const statusEl=document.getElementById("status");
 
-    // -------- Storage keys (ADMIN DECIDES) --------
-    // mode: "fixed" or "random"
-    const keyMode        = (team) => `pollwheel_admin_mode_${team}`;
-    // fixed winner chosen by admin (optional). If empty, fallback to TEAM_TO_PLAYER mapping
-    const keyFixedPick   = (team) => `pollwheel_admin_fixed_pick_${team}`;
+    const cx=canvas.width/2, cy=canvas.height/2;
+    const radius=Math.min(cx,cy)-10;
+    const TAU=Math.PI*2;
 
-    // Defaults if admin didn't set yet
-    const DEFAULT_MODE = "fixed"; // default admin mode
-    function getMode(team) {
-      return localStorage.getItem(keyMode(team)) || DEFAULT_MODE;
-    }
-    function getAdminFixedWinner(team) {
-      const pick = localStorage.getItem(keyFixedPick(team));
-      if (pick && options.includes(pick)) return pick;
-      // fallback to mapping if admin didn't choose
-      return TEAM_TO_PLAYER[team];
-    }
+    let angle=0, spinning=false;
 
-    // Elements
-    const loginView = document.getElementById("loginView");
-    const wheelView = document.getElementById("wheelView");
+    const normalizeTeam=(s)=>(s||"").trim().toUpperCase();
+    const isValidTeam=(t)=>Object.prototype.hasOwnProperty.call(TEAM_TO_PLAYER,t);
 
-    const teamInput = document.getElementById("teamInput");
-    const loginBtn = document.getElementById("loginBtn");
-    const loginError = document.getElementById("loginError");
-
-    const teamBadge = document.getElementById("teamBadge");
-    const logoutBtn = document.getElementById("logoutBtn");
-
-    const canvas = document.getElementById("wheel");
-    const ctx = canvas.getContext("2d");
-    const spinBtn = document.getElementById("spinBtn");
-    const resultEl = document.getElementById("result");
-    const statusEl = document.getElementById("status");
-    const modeInfo = document.getElementById("modeInfo");
-
-    // Wheel math
-    const cx = canvas.width / 2, cy = canvas.height / 2;
-    const radius = Math.min(cx, cy) - 10;
-    const TAU = Math.PI * 2;
-
-    let angle = 0;
-    let spinning = false;
-
-    function normalizeTeam(s) { return (s || "").trim().toUpperCase(); }
-    function isValidTeam(team) { return Object.prototype.hasOwnProperty.call(TEAM_TO_PLAYER, team); }
-
-    function showLogin() {
-      wheelView.style.display = "none";
-      loginView.style.display = "block";
-      loginError.style.display = "none";
-      teamInput.value = "";
+    function showLogin(){
+      wheelView.style.display="none";
+      loginView.style.display="block";
+      loginError.style.display="none";
+      teamInput.value="";
       teamInput.focus();
     }
-
-    function showWheel(team) {
-      loginView.style.display = "none";
-      wheelView.style.display = "block";
-      teamBadge.textContent = "TEAM: " + team;
+    function showWheel(team){
+      loginView.style.display="none";
+      wheelView.style.display="block";
+      teamBadge.textContent="TEAM: "+team;
       drawWheel();
       applyState(team);
     }
 
-    function doLogin() {
-      const team = normalizeTeam(teamInput.value);
-
-      if (!isValidTeam(team)) {
-        loginError.textContent = "Invalid team. Use TS, TPS, TD, TLK, TG";
-        loginError.style.display = "block";
+    function doLogin(){
+      const team=normalizeTeam(teamInput.value);
+      if(!isValidTeam(team)){
+        loginError.textContent="Invalid team";
+        loginError.style.display="block";
         return;
       }
-
-      // login one time only
-      if (localStorage.getItem(keyLoginUsed(team)) === "1") {
-        loginError.textContent = "This team already used login once. Admin can reset/unlock.";
-        loginError.style.display = "block";
+      if(localStorage.getItem(keyLoginUsed(team))==="1"){
+        loginError.textContent="Login locked (admin reset needed)";
+        loginError.style.display="block";
         return;
       }
-
-      localStorage.setItem(keyLoginUsed(team), "1");
-      localStorage.setItem(KEY_CURRENT_TEAM, team);
+      localStorage.setItem(keyLoginUsed(team),"1");
+      localStorage.setItem(KEY_CURRENT_TEAM,team);
       showWheel(team);
     }
 
-    loginBtn.addEventListener("click", doLogin);
-    teamInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+    loginBtn.addEventListener("click",doLogin);
+    teamInput.addEventListener("keydown",(e)=>{if(e.key==="Enter")doLogin();});
 
-    logoutBtn.addEventListener("click", () => {
+    logoutBtn.addEventListener("click",()=>{
       localStorage.removeItem(KEY_CURRENT_TEAM);
-      resultEl.textContent = "Result: —";
-      statusEl.textContent = "";
-      modeInfo.textContent = "";
+      resultEl.textContent="Result: —";
+      statusEl.textContent="";
       showLogin();
     });
 
-    // -------- Wheel drawing --------
-    function drawWheel() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const slice = TAU / options.length;
-
-      for (let i = 0; i < options.length; i++) {
-        const start = angle + i * slice;
-        const end = start + slice;
-
+    function drawWheel(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      const slice=TAU/options.length;
+      for(let i=0;i<options.length;i++){
+        const start=angle+i*slice, end=start+slice;
         ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.arc(cx, cy, radius, start, end);
+        ctx.moveTo(cx,cy);
+        ctx.arc(cx,cy,radius,start,end);
         ctx.closePath();
-
-        ctx.fillStyle = sliceColors[i] || "#3b82f6";
+        ctx.fillStyle=sliceColors[i]||"#3b82f6";
         ctx.fill();
 
         ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(start + slice / 2);
-        ctx.textAlign = "right";
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 16px Arial";
-        ctx.fillText(options[i], radius - 14, 6);
+        ctx.translate(cx,cy);
+        ctx.rotate(start+slice/2);
+        ctx.textAlign="right";
+        ctx.fillStyle="#fff";
+        ctx.font="bold 16px Arial";
+        ctx.fillText(options[i],radius-14,6);
         ctx.restore();
       }
-
       ctx.beginPath();
-      ctx.arc(cx, cy, 42, 0, TAU);
-      ctx.fillStyle = "#111827";
+      ctx.arc(cx,cy,42,0,TAU);
+      ctx.fillStyle="#111827";
       ctx.fill();
-
-      ctx.fillStyle = "#fff";
-      ctx.font = "bold 14px Arial";
-      ctx.textAlign = "center";
-      ctx.fillText("SPIN", cx, cy + 5);
+      ctx.fillStyle="#fff";
+      ctx.font="bold 14px Arial";
+      ctx.textAlign="center";
+      ctx.fillText("SPIN",cx,cy+5);
     }
 
-    function angleForIndexAtTop(idx) {
-      const slice = TAU / options.length;
-      const pointerAngle = idx * slice + slice / 2;
-      let a = (Math.PI * 1.5 - pointerAngle) % TAU;
-      if (a < 0) a += TAU;
+    function angleForIndexAtTop(idx){
+      const slice=TAU/options.length;
+      const pointerAngle=idx*slice+slice/2;
+      let a=(Math.PI*1.5-pointerAngle)%TAU;
+      if(a<0)a+=TAU;
       return a;
     }
 
-    function spinToIndex(idx, onDone) {
-      if (spinning) return;
-      spinning = true;
+    function spinToIndex(idx,onDone){
+      if(spinning)return;
+      spinning=true;
+      const startAngle=angle;
+      const finalAngleBase=angleForIndexAtTop(idx);
+      const extraSpins=6+Math.floor(Math.random()*3);
+      const targetAngle=finalAngleBase+extraSpins*TAU;
+      const start=performance.now();
+      const duration=5200;
 
-      const startAngle = angle;
-      const finalAngleBase = angleForIndexAtTop(idx);
-      const extraSpins = 6 + Math.floor(Math.random() * 3);
-      const targetAngle = finalAngleBase + extraSpins * TAU;
+      const easeOutCubic=(t)=>1-Math.pow(1-t,3);
 
-      const start = performance.now();
-      const duration = 5200;
-
-      function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
-
-      function frame(now) {
-        const t = Math.min(1, (now - start) / duration);
-        const eased = easeOutCubic(t);
-
-        angle = startAngle + (targetAngle - startAngle) * eased;
+      function frame(now){
+        const t=Math.min(1,(now-start)/duration);
+        const eased=easeOutCubic(t);
+        angle=startAngle+(targetAngle-startAngle)*eased;
         drawWheel();
-
-        if (t < 1) requestAnimationFrame(frame);
-        else {
-          angle = finalAngleBase;
+        if(t<1)requestAnimationFrame(frame);
+        else{
+          angle=finalAngleBase;
           drawWheel();
-          spinning = false;
-          onDone?.();
+          spinning=false;
+          onDone&&onDone();
         }
       }
       requestAnimationFrame(frame);
     }
 
-    function applyState(team) {
-      const spun = localStorage.getItem(keySpun(team)) === "1";
-      const winner = localStorage.getItem(keyWinner(team));
-      const mode = getMode(team);
-      const fixedPick = getAdminFixedWinner(team);
+    function getMode(team){
+      return localStorage.getItem(keyMode(team))||DEFAULT_MODE;
+    }
+    function getFixedWinner(team){
+      const pick=localStorage.getItem(keyFixedPick(team));
+      if(pick&&options.includes(pick))return pick;
+      return TEAM_TO_PLAYER[team];
+    }
+    function getRandomWinner(team){
+      const pick=localStorage.getItem(keyAdminRandomPick(team));
+      if(pick&&options.includes(pick))return pick;
+      return null; // admin must assign to prevent duplicates
+    }
 
-
-
-      if (spun && winner) {
-        spinBtn.disabled = true;
-        resultEl.textContent = "Result: " + winner + " ✅ (Locked)";
-        statusEl.textContent = "Already spun. Admin must reset to spin again.";
-
-        const idx = options.indexOf(winner);
-        if (idx >= 0) { angle = angleForIndexAtTop(idx); drawWheel(); }
-      } else {
-        spinBtn.disabled = false;
-        resultEl.textContent = "Result: —";
-        statusEl.textContent = "You can spin ONE time only.";
+    function applyState(team){
+      const spun=localStorage.getItem(keySpun(team))==="1";
+      const winner=localStorage.getItem(keyWinner(team));
+      if(spun&&winner){
+        spinBtn.disabled=true;
+        resultEl.textContent="Result: "+winner+" ✅";
+        statusEl.textContent="Congratulations";
+        const idx=options.indexOf(winner);
+        if(idx>=0){angle=angleForIndexAtTop(idx);drawWheel();}
+      }else{
+        spinBtn.disabled=false;
+        resultEl.textContent="Result: —";
+        statusEl.textContent="";
       }
     }
 
-    // -------- SINGLE SPIN (admin decides fixed/random) --------
-    function spinOnceAdminControlled() {
-      const team = localStorage.getItem(KEY_CURRENT_TEAM);
-      if (!team || !isValidTeam(team)) return;
+    function spinOnce(){
+      const team=localStorage.getItem(KEY_CURRENT_TEAM);
+      if(!team||!isValidTeam(team))return;
 
-      if (localStorage.getItem(keySpun(team)) === "1") {
+      if(localStorage.getItem(keySpun(team))==="1"){
         applyState(team);
         return;
       }
 
-      const mode = getMode(team);
-      let winner;
+      const mode=getMode(team);
+      let winner=null;
 
-      if (mode === "random") {
-        const idxR = Math.floor(Math.random() * options.length);
-        winner = options[idxR];
-      } else {
-        winner = getAdminFixedWinner(team); // admin chosen or mapping fallback
+      if(mode==="random"){
+        winner=getRandomWinner(team);
+        if(!winner){
+          resultEl.textContent="Result: —";
+          statusEl.textContent="Admin not assigned random winner yet";
+          return;
+        }
+      }else{
+        winner=getFixedWinner(team);
       }
 
-      const idx = options.indexOf(winner);
-      if (idx < 0) return;
+      const idx=options.indexOf(winner);
+      if(idx<0)return;
 
-      spinBtn.disabled = true;
-      resultEl.textContent = "Result: spinning...";
-      statusEl.textContent = "Spinning...";
+      spinBtn.disabled=true;
+      resultEl.textContent="Result: spinning...";
+      statusEl.textContent="Spinning...";
 
-      spinToIndex(idx, () => {
-        localStorage.setItem(keySpun(team), "1");
-        localStorage.setItem(keyWinner(team), winner);
-
-        resultEl.textContent = "Result: " + winner + " ✅ (Locked)";
-        statusEl.textContent = "Saved. Admin controls reset/unlock.";
+      spinToIndex(idx,()=>{
+        localStorage.setItem(keySpun(team),"1");
+        localStorage.setItem(keyWinner(team),winner);
+        resultEl.textContent="Result: "+winner+" ✅";
+        statusEl.textContent="Congratulations";
         applyState(team);
       });
     }
 
-    spinBtn.addEventListener("click", spinOnceAdminControlled);
-    canvas.addEventListener("click", spinOnceAdminControlled);
+    spinBtn.addEventListener("click",spinOnce);
+    canvas.addEventListener("click",spinOnce);
 
-    // Boot
-    (function boot() {
-      const savedTeam = localStorage.getItem(KEY_CURRENT_TEAM);
-      if (savedTeam && isValidTeam(savedTeam)) showWheel(savedTeam);
+    (function boot(){
+      const savedTeam=localStorage.getItem(KEY_CURRENT_TEAM);
+      if(savedTeam&&isValidTeam(savedTeam))showWheel(savedTeam);
       else showLogin();
     })();
   </script>
