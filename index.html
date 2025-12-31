@@ -61,7 +61,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
   <script>
-    // ✅ Your Firebase config (tpl-poll-wheel)
     const firebaseConfig = {
       apiKey: "AIzaSyApEQ8ogTpZ94IZRh_GWtCsUhi608x4sG4",
       authDomain: "tpl-poll-wheel.firebaseapp.com",
@@ -70,7 +69,6 @@
       messagingSenderId: "149256036270",
       appId: "1:149256036270:web:f7d9486571ef69501df23f"
     };
-
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
@@ -109,10 +107,12 @@
     let angle=0, spinning=false;
     let unsubTeam=null;
 
+    // ✅ prevent snapshot from overriding animation
+    let animating=false;
+
     const normalizeTeam=(s)=>(s||"").trim().toUpperCase();
     const isValidTeam=(t)=>Object.prototype.hasOwnProperty.call(TEAM_TO_PLAYER,t);
-
-    function teamRef(team){ return db.collection("teams").doc(team); }
+    const teamRef=(team)=>db.collection("teams").doc(team);
 
     function showLogin(){
       if(unsubTeam){ unsubTeam(); unsubTeam=null; }
@@ -145,14 +145,22 @@
           randomPick:"",
           updatedAt: Date.now()
         }, { merge:true });
+      } else {
+        // ensure missing fields exist
+        await ref.set({
+          mode: snap.data().mode || "fixed",
+          fixedPick: snap.data().fixedPick || (TEAM_TO_PLAYER[team] || ""),
+          randomPick: snap.data().randomPick || "",
+          updatedAt: Date.now()
+        }, { merge:true });
       }
     }
 
     function listenTeam(team){
       if(unsubTeam){ unsubTeam(); unsubTeam=null; }
       unsubTeam = teamRef(team).onSnapshot((doc)=>{
-        const data = doc.exists ? doc.data() : null;
-        applyState(team, data);
+        if(!doc.exists) return;
+        applyState(doc.data());
       });
     }
 
@@ -165,16 +173,13 @@
       }
 
       await ensureTeamDoc(team);
-
       const ref = teamRef(team);
 
       try{
         await db.runTransaction(async (tx)=>{
           const snap = await tx.get(ref);
           const d = snap.data() || {};
-          if(d.loginUsed === true){
-            throw new Error("LOCKED");
-          }
+          if(d.loginUsed === true) throw new Error("LOCKED");
           tx.set(ref, { loginUsed:true, updatedAt:Date.now() }, { merge:true });
         });
 
@@ -200,8 +205,10 @@
     function drawWheel(){
       ctx.clearRect(0,0,canvas.width,canvas.height);
       const slice=TAU/options.length;
+
       for(let i=0;i<options.length;i++){
         const start=angle+i*slice, end=start+slice;
+
         ctx.beginPath();
         ctx.moveTo(cx,cy);
         ctx.arc(cx,cy,radius,start,end);
@@ -218,10 +225,12 @@
         ctx.fillText(options[i],radius-14,6);
         ctx.restore();
       }
+
       ctx.beginPath();
       ctx.arc(cx,cy,42,0,TAU);
       ctx.fillStyle="#111827";
       ctx.fill();
+
       ctx.fillStyle="#fff";
       ctx.font="bold 14px Arial";
       ctx.textAlign="center";
@@ -244,6 +253,7 @@
       const finalAngleBase=angleForIndexAtTop(idx);
       const extraSpins=6+Math.floor(Math.random()*3);
       const targetAngle=finalAngleBase+extraSpins*TAU;
+
       const start=performance.now();
       const duration=5200;
       const easeOutCubic=(t)=>1-Math.pow(1-t,3);
@@ -264,8 +274,8 @@
       requestAnimationFrame(frame);
     }
 
-    function applyState(team, d){
-      if(!d) return;
+    function applyState(d){
+      if(animating) return;
 
       if(d.spun && d.winner){
         spinBtn.disabled=true;
@@ -285,52 +295,42 @@
       if(!team || !isValidTeam(team)) return;
 
       await ensureTeamDoc(team);
-
       const ref = teamRef(team);
 
       try{
+        let winner="";
+
         await db.runTransaction(async (tx)=>{
           const snap = await tx.get(ref);
           const d = snap.data() || {};
 
-          if(d.spun === true){
-            throw new Error("ALREADY");
-          }
+          if(d.spun === true) throw new Error("ALREADY");
 
           const mode = d.mode || "fixed";
-          let winner = "";
 
           if(mode === "random"){
             winner = d.randomPick || "";
-            if(!winner || !options.includes(winner)){
-              throw new Error("NO_RANDOM_ASSIGNED");
-            }
+            if(!winner || !options.includes(winner)) throw new Error("NO_RANDOM_ASSIGNED");
           }else{
             const fp = d.fixedPick;
-            if(fp && options.includes(fp)) winner = fp;
-            else winner = TEAM_TO_PLAYER[team] || "";
+            winner = (fp && options.includes(fp)) ? fp : (TEAM_TO_PLAYER[team] || "");
           }
 
-          if(!winner || !options.includes(winner)){
-            throw new Error("BAD_WINNER");
-          }
+          if(!winner || !options.includes(winner)) throw new Error("BAD_WINNER");
 
           tx.set(ref, { spun:true, winner, updatedAt:Date.now() }, { merge:true });
-          tx.set(db.collection("events").add({}), {}); // no-op (ignored)
         });
 
-        const snap = await ref.get();
-        const d = snap.data();
-        const winner = d.winner;
-
         const idx = options.indexOf(winner);
-        if(idx < 0) return;
+        if(idx<0) return;
 
+        animating=true;
         spinBtn.disabled=true;
         resultEl.textContent="Result: spinning...";
         statusEl.textContent="Spinning...";
 
         spinToIndex(idx, ()=>{
+          animating=false;
           resultEl.textContent="Result: "+winner+" ✅";
           statusEl.textContent="Congratulations";
         });
